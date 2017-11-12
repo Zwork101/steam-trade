@@ -1,4 +1,4 @@
-from steam_enums import SteamUrls
+from pytrade.steam_enums import SteamUrls
 import aiohttp
 import rsa
 import base64

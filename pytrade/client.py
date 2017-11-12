@@ -1,7 +1,7 @@
-from steam_enums import SteamUrls, ETradeOfferState
-from EconTradeOffer import TradeOffer, merge_item
-from EconItem import Item
-from confirmations import ConfManager
+from pytrade.steam_enums import SteamUrls, ETradeOfferState
+from pytrade.EconTradeOffer import TradeOffer, merge_item
+from pytrade.EconItem import Item
+from pytrade.confirmations import ConfManager
 from steamid import SteamID
 import aiohttp
 import asyncio

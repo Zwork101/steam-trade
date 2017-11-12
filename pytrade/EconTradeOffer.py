@@ -1,6 +1,6 @@
 from steamid import SteamID
-from steam_enums import ETradeOfferState, SteamUrls
-from EconItem import Item
+from pytrade.steam_enums import ETradeOfferState, SteamUrls
+from pytrade.EconItem import Item
 import asyncio
 import json
 
