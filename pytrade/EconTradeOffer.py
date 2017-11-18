@@ -129,7 +129,7 @@ class TradeOffer:
                             tries += 1
                             await asyncio.sleep(2)
                         else:
-                            #print(await conf.confirm())
+                            await conf.confirm()
                             return True
                     return False
             return True
@@ -162,7 +162,7 @@ class TradeOffer:
             trade_prams = json.dumps(trade_prams)
 
         data = {
-            'sessionid': self.manager._get_session(),
+            'sessionid': self.manager.get_session(),
             'serverid': 1,
             'partner': self.steamid_other.toString(),
             'tradeoffermessage': self.message[:128],
