@@ -1,0 +1,309 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>pytrade.client &#8212; steam-trade 1.0.2 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '1.0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for pytrade.client</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">pytrade.steam_enums</span> <span class="k">import</span> <span class="n">SteamUrls</span><span class="p">,</span> <span class="n">ETradeOfferState</span>
+<span class="kn">from</span> <span class="nn">pytrade.EconTradeOffer</span> <span class="k">import</span> <span class="n">TradeOffer</span><span class="p">,</span> <span class="n">merge_item</span>
+<span class="kn">from</span> <span class="nn">pytrade.EconItem</span> <span class="k">import</span> <span class="n">Item</span>
+<span class="kn">from</span> <span class="nn">pytrade.confirmations</span> <span class="k">import</span> <span class="n">ConfManager</span>
+<span class="kn">from</span> <span class="nn">steamid</span> <span class="k">import</span> <span class="n">SteamID</span>
+<span class="kn">import</span> <span class="nn">aiohttp</span>
+<span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">from</span> <span class="nn">pyee</span> <span class="k">import</span> <span class="n">EventEmitter</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="k">def</span> <span class="nf">require_login</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">logged_in</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Manager is not logged in&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">wrapper</span>
+
+<span class="k">def</span> <span class="nf">require_key</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">key</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Could not find key&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">wrapper</span>
+
+<div class="viewcode-block" id="TradeManager"><a class="viewcode-back" href="../../manager.html#pytrade.client.TradeManager">[docs]</a><span class="k">class</span> <span class="nc">TradeManager</span><span class="p">(</span><span class="n">EventEmitter</span><span class="p">,</span> <span class="n">ConfManager</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">steamid</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">language</span><span class="o">=</span><span class="s1">&#39;en&#39;</span><span class="p">,</span> <span class="n">identity_secret</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">poll_delay</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+        <span class="n">EventEmitter</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">aiohttp</span><span class="o">.</span><span class="n">ClientSession</span><span class="p">()</span>
+        <span class="n">ConfManager</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">identity_secret</span><span class="p">,</span> <span class="n">steamid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">steamid</span> <span class="o">=</span> <span class="n">SteamID</span><span class="p">(</span><span class="n">steamid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">steamid</span><span class="o">.</span><span class="n">isValid</span><span class="p">()</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">steamid</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">SteamID</span><span class="o">.</span><span class="n">Type</span><span class="p">[</span><span class="s1">&#39;INDIVIDUAL&#39;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Steam ID </span><span class="si">{self.steamid}</span><span class="s2"> is not valid, or is not a user ID&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="o">=</span> <span class="n">key</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">language</span> <span class="o">=</span> <span class="n">language</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poll_delay</span> <span class="o">=</span> <span class="n">poll_delay</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logged_in</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_trade_cache</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conf_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="TradeManager.login"><a class="viewcode-back" href="../../manager.html#pytrade.client.TradeManager.login">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">login</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">async_client</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Take a AsyncClient object, using the do_login method is optional.</span>
+<span class="sd">        You must have passed in all credentials and requirements to the client already.</span>
+<span class="sd">        :param steam_client: :class AsyncClient:</span>
+<span class="sd">        :return: None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">async_client</span><span class="o">.</span><span class="n">logged_in</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">async_client</span><span class="o">.</span><span class="n">session</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logged_in</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">session</span> <span class="o">=</span> <span class="k">await</span> <span class="n">async_client</span><span class="o">.</span><span class="n">do_login</span><span class="p">()</span>
+            <span class="k">if</span> <span class="k">await</span> <span class="n">async_client</span><span class="o">.</span><span class="n">test_login</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">session</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logged_in</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Login Failed&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;logged_on&#39;</span><span class="p">)</span></div>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_run_forever</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;start_poll&#39;</span><span class="p">)</span>
+            <span class="c1">#Check for current actions, then parse them</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_trade_poll</span><span class="p">()</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_confirmation_poll</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;end_poll&#39;</span><span class="p">)</span>
+            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poll_delay</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TradeManager.run_forever"><a class="viewcode-back" href="../../manager.html#pytrade.client.TradeManager.run_forever">[docs]</a>    <span class="k">def</span> <span class="nf">run_forever</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run the bot forever, unless the time sense calling the function is greater than timeout.</span>
+<span class="sd">        :param timeout: :class int/float:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+        <span class="n">asyncio</span><span class="o">.</span><span class="n">ensure_future</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_run_forever</span><span class="p">())</span>
+        <span class="n">loop</span><span class="o">.</span><span class="n">run_forever</span><span class="p">()</span></div>
+
+    <span class="nd">@require_key</span>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">get_trade_offers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">active_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">received</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        :param active_only:</span>
+<span class="sd">        :param sent:</span>
+<span class="sd">        :param received:</span>
+<span class="sd">        :return trade_list:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">offers</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">api_call</span><span class="p">(</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="s1">&#39;IEconService&#39;</span><span class="p">,</span> <span class="s1">&#39;GetTradeOffers&#39;</span><span class="p">,</span> <span class="s1">&#39;v1&#39;</span><span class="p">,</span> <span class="n">langauge</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">language</span><span class="p">,</span>
+                            <span class="n">get_descriptions</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">active_only</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">get_sent_offers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">get_received_offers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">sent_offers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">got_offers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">trade_offers</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="n">sent</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">offer</span> <span class="ow">in</span> <span class="n">offers</span><span class="p">[</span><span class="s1">&#39;response&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;trade_offers_sent&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="n">trade_offer</span> <span class="o">=</span> <span class="n">TradeOffer</span><span class="p">(</span><span class="n">offer</span><span class="p">,</span> <span class="n">offers</span><span class="p">[</span><span class="s1">&#39;response&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;descriptions&#39;</span><span class="p">,</span> <span class="p">[]),</span> <span class="bp">self</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">trade_offer</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">!=</span> <span class="n">ETradeOfferState</span><span class="o">.</span><span class="n">Active</span> <span class="ow">and</span> <span class="n">active_only</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">sent_offers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">trade_offer</span><span class="p">)</span>
+            <span class="n">trade_offers</span><span class="p">[</span><span class="s1">&#39;sent&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sent_offers</span>
+
+        <span class="k">if</span> <span class="n">received</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">offer</span> <span class="ow">in</span> <span class="n">offers</span><span class="p">[</span><span class="s1">&#39;response&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;trade_offers_received&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="n">trade_offer</span> <span class="o">=</span> <span class="n">TradeOffer</span><span class="p">(</span><span class="n">offer</span><span class="p">,</span> <span class="n">offers</span><span class="p">[</span><span class="s1">&#39;response&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;descriptions&#39;</span><span class="p">,</span> <span class="p">[]),</span> <span class="bp">self</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">trade_offer</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">!=</span> <span class="n">ETradeOfferState</span><span class="o">.</span><span class="n">Active</span> <span class="ow">and</span> <span class="n">active_only</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">got_offers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">trade_offer</span><span class="p">)</span>
+            <span class="n">trade_offers</span><span class="p">[</span><span class="s1">&#39;received&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">got_offers</span>
+
+        <span class="k">return</span> <span class="n">trade_offers</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_trade_poll</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1">#First, check for new trades</span>
+        <span class="n">trades</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_trade_offers</span><span class="p">(</span><span class="n">active_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">received</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">got_trades</span> <span class="o">=</span> <span class="n">trades</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;received&#39;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="n">sent_trades</span> <span class="o">=</span> <span class="n">trades</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sent&#39;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">for</span> <span class="n">trade</span> <span class="ow">in</span> <span class="n">got_trades</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">trade</span><span class="o">.</span><span class="n">tradeofferid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_trade_cache</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_trade_cache</span><span class="p">[</span><span class="n">trade</span><span class="o">.</span><span class="n">tradeofferid</span><span class="p">]</span> <span class="o">=</span> <span class="n">trade</span>
+                <span class="k">if</span> <span class="n">trade</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">==</span> <span class="n">ETradeOfferState</span><span class="o">.</span><span class="n">Active</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;new_trade&#39;</span><span class="p">,</span> <span class="n">trade</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_test_states</span><span class="p">(</span><span class="n">trade</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">trade</span> <span class="ow">in</span> <span class="n">sent_trades</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">trade</span><span class="o">.</span><span class="n">tradeofferid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_trade_cache</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_trade_cache</span><span class="p">[</span><span class="n">trade</span><span class="o">.</span><span class="n">tradeofferid</span><span class="p">]</span> <span class="o">=</span> <span class="n">trade</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;trade_sent&#39;</span><span class="p">,</span> <span class="n">trade</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_test_states</span><span class="p">(</span><span class="n">trade</span><span class="p">)</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_confirmation_poll</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">confs</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_confirmations</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">conf</span> <span class="ow">in</span> <span class="n">confs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">conf</span><span class="o">.</span><span class="n">id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf_cache</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_conf_cache</span><span class="p">[</span><span class="n">conf</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">conf</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;new_conf&#39;</span><span class="p">,</span> <span class="n">conf</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">_test_states</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trade</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">trade</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_trade_cache</span><span class="p">[</span><span class="n">trade</span><span class="o">.</span><span class="n">tradeofferid</span><span class="p">]</span><span class="o">.</span><span class="n">trade_offer_state</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_trade_cache</span><span class="p">[</span><span class="n">trade</span><span class="o">.</span><span class="n">tradeofferid</span><span class="p">]</span> <span class="o">=</span> <span class="n">trade</span>
+            <span class="k">if</span> <span class="n">trade</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">==</span> <span class="n">ETradeOfferState</span><span class="o">.</span><span class="n">Accepted</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;trade_accepted&#39;</span><span class="p">,</span> <span class="n">trade</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">trade</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">==</span> <span class="n">ETradeOfferState</span><span class="o">.</span><span class="n">Canceled</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;trade_canceled&#39;</span><span class="p">,</span> <span class="n">trade</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">trade</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">==</span> <span class="n">ETradeOfferState</span><span class="o">.</span><span class="n">Declined</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;trade_declined&#39;</span><span class="p">,</span> <span class="n">trade</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">trade</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">==</span> <span class="n">ETradeOfferState</span><span class="o">.</span><span class="n">Expired</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;trade_expired&#39;</span><span class="p">,</span> <span class="n">trade</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">trade</span><span class="o">.</span><span class="n">trade_offer_state</span> <span class="o">==</span> <span class="n">ETradeOfferState</span><span class="o">.</span><span class="n">Countered</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;trade_countered&#39;</span><span class="p">,</span> <span class="n">trade</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;trade_state_changed&#39;</span><span class="p">,</span> <span class="n">trade</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="TradeManager.api_call"><a class="viewcode-back" href="../../manager.html#pytrade.client.TradeManager.api_call">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">api_call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">api</span><span class="p">,</span> <span class="n">call</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="o">**</span><span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Request data from steam through this function when using the API</span>
+<span class="sd">        :param method:</span>
+<span class="sd">        :param api:</span>
+<span class="sd">        :param call:</span>
+<span class="sd">        :param version:</span>
+<span class="sd">        :kwargs data:</span>
+<span class="sd">        :return json:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">new_url</span> <span class="o">=</span> <span class="n">SteamUrls</span><span class="o">.</span><span class="n">Api</span><span class="o">.</span><span class="n">value</span> <span class="o">+</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">api</span><span class="p">,</span> <span class="n">call</span><span class="p">,</span> <span class="n">version</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;get&#39;</span><span class="p">:</span>
+            <span class="k">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">new_url</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">data</span><span class="p">)</span> <span class="k">as</span> <span class="n">resp</span><span class="p">:</span>
+                <span class="c1">#print(await resp.json())</span>
+                <span class="k">return</span> <span class="k">await</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()</span> <span class="c1">#Should be json</span>
+        <span class="k">elif</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;post&#39;</span><span class="p">:</span>
+            <span class="k">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">new_url</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span> <span class="k">as</span> <span class="n">resp</span><span class="p">:</span>
+                <span class="k">return</span> <span class="k">await</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;delete&#39;</span><span class="p">:</span>
+            <span class="k">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">new_url</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span> <span class="k">as</span> <span class="n">resp</span><span class="p">:</span>
+                <span class="k">return</span> <span class="k">await</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;put&#39;</span><span class="p">:</span>
+            <span class="k">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">new_url</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span> <span class="k">as</span> <span class="n">resp</span><span class="p">:</span>
+                <span class="k">return</span> <span class="k">await</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Invalid method&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Invalid method: </span><span class="si">{method}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">get_session</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">cookie_jar</span><span class="o">.</span><span class="n">_cookies</span><span class="p">[</span><span class="s1">&#39;steamcommunity.com&#39;</span><span class="p">][</span><span class="s1">&#39;sessionid&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">parse_token_from_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trade_offer_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">reg</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s2">&quot;https?:\/\/(www.)?steamcommunity.com\/tradeoffer\/new\/?\?partner=\d+(&amp;|&amp;amp;)token=(?P&lt;token&gt;[a-zA-Z0-9-_]+)&quot;</span><span class="p">)</span>
+        <span class="n">match</span> <span class="o">=</span> <span class="n">reg</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">trade_offer_url</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">match</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Unable to match token from trade_offer_url&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">match</span><span class="p">[</span><span class="s1">&#39;token&#39;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="TradeManager.get_inventory"><a class="viewcode-back" href="../../manager.html#pytrade.client.TradeManager.get_inventory">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">get_inventory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">steamid</span><span class="p">:</span> <span class="n">SteamID</span><span class="p">,</span> <span class="n">appid</span><span class="p">,</span> <span class="n">contextid</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">tradable_only</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get a user&#39;s inventory</span>
+<span class="sd">        :param steamid:</span>
+<span class="sd">        :param appid:</span>
+<span class="sd">        :param contextid:</span>
+<span class="sd">        :param tradable_only:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="n">f</span><span class="s2">&quot;https://steamcommunity.com/profiles/{steamid.toString()}/inventory/json/</span><span class="si">{appid}</span><span class="s2">/</span><span class="si">{contextid}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;trading&#39;</span><span class="p">:</span><span class="n">tradable_only</span><span class="p">},</span>
+            <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Referer&quot;</span><span class="p">:</span> <span class="n">f</span><span class="s2">&quot;https://steamcommunity.com/profiles/{steamid.toString()}/inventory&quot;</span><span class="p">})</span> <span class="k">as</span> <span class="n">resp</span><span class="p">:</span>
+                <span class="n">inv</span> <span class="o">=</span> <span class="k">await</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">inv</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="n">items</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">item_id</span> <span class="ow">in</span> <span class="n">inv</span><span class="p">[</span><span class="s1">&#39;rgInventory&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">item_id</span><span class="p">)</span>
+            <span class="nb">id</span> <span class="o">=</span> <span class="n">item_id</span><span class="p">[</span><span class="s1">&#39;classid&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="n">item_id</span><span class="p">[</span><span class="s1">&#39;instanceid&#39;</span><span class="p">]</span>
+            <span class="n">item_desc</span> <span class="o">=</span> <span class="n">inv</span><span class="p">[</span><span class="s1">&#39;rgDescriptions&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">item_desc</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">items</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">Item</span><span class="p">(</span><span class="n">item_id</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="n">items</span><span class="p">[</span><span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">Item</span><span class="p">(</span><span class="n">merge_item</span><span class="p">(</span><span class="n">item_id</span><span class="p">,</span> <span class="n">item_desc</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">items</span></div></div>
+
+
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Zwork101.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

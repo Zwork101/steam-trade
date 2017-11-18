@@ -24,6 +24,10 @@ def require_key(func):
 
 class TradeManager(EventEmitter, ConfManager):
 
+    """
+    This is the TradeManager object, it inherits from the ConfManager and EventEmitter objects.
+    """
+
     def __init__(self, steamid, key=None, language='en', identity_secret='', poll_delay=10):
         EventEmitter.__init__(self)
         self.session = aiohttp.ClientSession()
@@ -42,8 +46,9 @@ class TradeManager(EventEmitter, ConfManager):
         """
         Take a AsyncClient object, using the do_login method is optional.
         You must have passed in all credentials and requirements to the client already.
-        :param steam_client: :class AsyncClient:
-        :return: None
+        Please make sure to run this first, just like in the example.py
+
+        :param async_client: Does not need to be logged in, import from pytrade.login
         """
         if async_client.logged_in:
             self.session = async_client.session
@@ -69,8 +74,9 @@ class TradeManager(EventEmitter, ConfManager):
     def run_forever(self):
         """
         Run the bot forever, unless the time sense calling the function is greater than timeout.
+
         :param timeout: :class int/float:
-        :return:
+        :return: (Will never return, but if it does, None)
         """
         loop = asyncio.get_event_loop()
         asyncio.ensure_future(self._run_forever())
@@ -79,6 +85,7 @@ class TradeManager(EventEmitter, ConfManager):
     @require_key
     async def get_trade_offers(self, active_only=True, sent=False, received=True):
         """
+        get your trade offers, key is required.
 
         :param active_only:
         :param sent:
@@ -178,7 +185,6 @@ class TradeManager(EventEmitter, ConfManager):
             async with self.session.put(new_url, data=data) as resp:
                 return await resp.json()
         else:
-            print('Invalid method')
             raise ValueError(f"Invalid method: {method}")
 
     def get_session(self):
@@ -194,6 +200,7 @@ class TradeManager(EventEmitter, ConfManager):
     async def get_inventory(self, steamid: SteamID, appid, contextid=2, tradable_only=1):
         """
         Get a user's inventory
+
         :param steamid:
         :param appid:
         :param contextid:
@@ -211,7 +218,6 @@ class TradeManager(EventEmitter, ConfManager):
 
         items = {}
         for _, item_id in inv['rgInventory'].items():
-            print(item_id)
             id = item_id['classid'] + '_' + item_id['instanceid']
             item_desc = inv['rgDescriptions'].get(id)
             if item_desc is None:

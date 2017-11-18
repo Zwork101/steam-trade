@@ -1,6 +1,8 @@
 from enum import Enum
 
 class ETradeOfferState(Enum):
+    """
+    """
     Invalid = 1
     Active = 2
     Accepted = 3
@@ -14,6 +16,8 @@ class ETradeOfferState(Enum):
     Escrow = 11
 
 class SteamUrls(Enum):
+    """
+    """
     Community = "https://steamcommunity.com"
     Api = "https://api.steampowered.com"
     Store = "https://store.steampowered.com"

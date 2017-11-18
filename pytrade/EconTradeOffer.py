@@ -129,7 +129,7 @@ class TradeOffer:
                             tries += 1
                             await asyncio.sleep(2)
                         else:
-                            print(await conf.confirm())
+                            #print(await conf.confirm())
                             return True
                     return False
             return True
