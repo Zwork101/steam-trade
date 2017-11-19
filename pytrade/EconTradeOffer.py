@@ -34,6 +34,8 @@ class TradeOffer:
 
     def _load(self, data, desc, manager, parse_items):
         # Define basic variables, set attributes
+        self.raw = data
+        self.raw_descriptions = desc
         self.manager = manager
         self.tradeofferid = data.get('tradeofferid', '')
         self.steamid_other = SteamID(str(data.get('accountid_other', 309304171) + 76561197960265728))
@@ -41,6 +43,7 @@ class TradeOffer:
         self.expiration_time = data.get('expiration_time')
         self.is_our_offer = data.get('is_our_offer')
         self.from_real_time_trade = data.get('from_real_time_trade')
+        self.escrow_end_date = data.get('escrow_end_date')
         self.items_to_give = []
         self.items_to_receive = []
         self._counter = 0
@@ -65,6 +68,7 @@ class TradeOffer:
                     desc_id = description['classid'] + '_' + description['instanceid']
                     if desc_id == item['classid'] + '_' + item['instanceid']:
                         self.items_to_give.append(Item(merge_item(item, description)))  # If so, parse and append
+                        break
             else:
                 self.items_to_give.append(Item(item, True))  # If it's missing, just add the item ids as an Item
 
@@ -74,6 +78,7 @@ class TradeOffer:
                     desc_id = description['classid'] + '_' + description['instanceid']
                     if desc_id == item['classid'] + '_' + item['instanceid']:
                         self.items_to_receive.append(Item(merge_item(item, description)))
+                        break
             else:
                 self.items_to_receive.append(Item(item, True))
 
