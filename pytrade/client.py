@@ -28,7 +28,7 @@ class TradeManager(EventEmitter, ConfManager):
     This is the TradeManager object, it inherits from the ConfManager and EventEmitter objects.
     """
 
-    def __init__(self, steamid, key=None, language='en', identity_secret='', poll_delay=10):
+    def __init__(self, steamid, key=None, language='en', identity_secret='', poll_delay=30):
         EventEmitter.__init__(self)
         self.session = aiohttp.ClientSession()
         ConfManager.__init__(self, identity_secret, steamid, self.session)
@@ -216,13 +216,13 @@ class TradeManager(EventEmitter, ConfManager):
         if not inv['success']:
             return []
 
-        items = {}
+        items = []
         for _, item_id in inv['rgInventory'].items():
             id = item_id['classid'] + '_' + item_id['instanceid']
             item_desc = inv['rgDescriptions'].get(id)
             if item_desc is None:
-                items[id] = Item(item_id, True)
-            items[id] = Item(merge_item(item_id, item_desc))
+                items.append(Item(item_id, True))
+            items.append(Item(merge_item(item_id, item_desc)))
         return items
 
 
