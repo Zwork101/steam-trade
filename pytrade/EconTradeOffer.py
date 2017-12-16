@@ -86,7 +86,7 @@ class TradeOffer:
     async def update(self):
         this_offer = await self.manager.api_call('GET', 'IEconService', 'GetTradeOffer', 'v1', key=self.manager.key,
                                                  tradeofferid=self.tradeofferid, language=self.manager.language)
-        self._load(this_offer['response']['offer'], this_offer['response'].get('descriptions'), self.manager, True)
+        self._load(this_offer['response']['offer'], this_offer['response'].get('descriptions', []), self.manager, True)
 
     @require_manager_key
     async def cancel(self):
