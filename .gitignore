@@ -1,5 +1,5 @@
 # Created by .ignore support plugin (hsz.mobi)
 .idea/
-.pytrade/__pycache__/
+__pycache__/
 setup.py
 testing.py
