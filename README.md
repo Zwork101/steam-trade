@@ -25,7 +25,7 @@ First, you will need to create an *AsyncClient* object, and a *TradeManager* obj
 steam_login = login.AsyncClient("Zwork101", "abc123", "super-secret-secret")
 trade_manager = client.TradeManager("12345678", "steam api key", identity_secret="also-super-secret")
 ```
-Now, run "setup" code. Code, like reading a database, or getting prices from a site. This code will only be run once. For example, I might to somthing like:
+Now, run "setup" code. Code, like reading a database, or getting prices from a site. This code will only be run once. For example, I might to something like:
 ```py
 key_price = 0
 with open('key_price.txt') as file:
