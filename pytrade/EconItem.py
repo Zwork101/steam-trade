@@ -13,6 +13,7 @@ class Item:
         self.appid = data.get('appid')
         self.classid = data.get('classid')
         self.instanceid = data.get('instanceid')
+        self.assetid = data.get('assetid')
         self.icon_url = data.get('icon_url')
         self.icon_url_large = data.get('icon_url_large')
         self.pos = data.get('pos')
