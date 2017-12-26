@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 import base64
 from bs4 import BeautifulSoup
 from hashlib import sha1
@@ -32,8 +33,13 @@ class Conf:
         params['op'] = 'allow'
         params['cid'] = self.data_confid
         params['ck'] = self.data_key
-        async with self.manager.session.get(self.manager.CONF_URL + '/ajaxop', params=params) as resp:
-            return await resp.text()
+        try:
+            async with self.manager.session.get(self.manager.CONF_URL + '/ajaxop', params=params) as resp:
+                return await resp.text()
+        except TypeError:
+            self.manager.logged_on = False
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(asyncio.ensure_future(self.manager.login()))
 
     async def anfirm(self):
         params = self._confirm_params('cancel')

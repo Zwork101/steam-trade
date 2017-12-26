@@ -171,21 +171,25 @@ class TradeManager(EventEmitter, ConfManager):
         :return json:
         """
         new_url = SteamUrls.Api.value + '/'.join(['', api, call, version])
-        if method.lower() == 'get':
-            async with self.session.get(new_url, params=data) as resp:
+        try:
+            if method.lower() == 'get':
+                async with self.session.get(new_url, params=data) as resp:
                 #print(await resp.json())
-                return await resp.json() #Should be json
-        elif method.lower() == 'post':
-            async with self.session.post(new_url, data=data) as resp:
-                return await resp.json()
-        elif method.lower() == 'delete':
-            async with self.session.delete(new_url, data=data) as resp:
-                return await resp.json()
-        elif method.lower() == 'put':
-            async with self.session.put(new_url, data=data) as resp:
-                return await resp.json()
-        else:
-            raise ValueError(f"Invalid method: {method}")
+                    return await resp.json() #Should be json
+            elif method.lower() == 'post':
+                async with self.session.post(new_url, data=data) as resp:
+                    return await resp.json()
+            elif method.lower() == 'delete':
+                async with self.session.delete(new_url, data=data) as resp:
+                    return await resp.json()
+            elif method.lower() == 'put':
+                async with self.session.put(new_url, data=data) as resp:
+                    return await resp.json()
+            else:
+                raise ValueError(f"Invalid method: {method}")
+        except aiohttp.ContentTypeError:
+            html = await resp.text()
+            raise ValueError("Expected JSON, was given HTML:\n" + html)
 
     def get_session(self):
         return self.session.cookie_jar._cookies['steamcommunity.com']['sessionid'].value
