@@ -4,7 +4,7 @@
 
 Steam-Trade is an asynchronous, event based, python steam trade library. It uses the python port `pyee` of EventEmitter, so you can focus on processing trades, and not fetching for them and parsing them! 
 
-![example](https://my-request.tk/event_new_trade.PNG "Code to accept all offers from me :D")
+![Example](https://my-request.tk/event_new_trade.PNG "Code to accept all offers from me :D")
 
 It's **asynchronous**, so that means it can do multiple tasks at the same time! What does this mean for you? What that means, if you get multiple trades at once, it can work on all of them at the same time. This is for total efficiency, and it's easy to work with!
 
