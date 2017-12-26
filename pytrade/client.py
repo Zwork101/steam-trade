@@ -88,7 +88,7 @@ class TradeManager(EventEmitter, ConfManager):
         get your trade offers, key is required.
 
         :param active_only:
-        :param sent:
+        :`param sent:
         :param received:
         :return trade_list:
         """
@@ -119,6 +119,10 @@ class TradeManager(EventEmitter, ConfManager):
     async def _trade_poll(self):
         #First, check for new trades
         trades = await self.get_trade_offers(active_only=False, sent=True, received=True)
+        if not trades[0]:
+            self.emit('poll_error', trades[1])
+            return
+        trades = trades[1]
         got_trades = trades.get('received', [])
         sent_trades = trades.get('sent', [])
         for trade in got_trades:
@@ -137,7 +141,9 @@ class TradeManager(EventEmitter, ConfManager):
 
     async def _confirmation_poll(self):
         confs = await self.get_confirmations()
-        for conf in confs:
+        if not confs[0]:
+            self.emit('poll_error', confs[1])
+        for conf in confs[1]:
             if conf.id not in self._conf_cache.keys():
                 self._conf_cache[conf.id] = conf
                 self.emit('new_conf', conf)
@@ -174,22 +180,25 @@ class TradeManager(EventEmitter, ConfManager):
         try:
             if method.lower() == 'get':
                 async with self.session.get(new_url, params=data) as resp:
-                #print(await resp.json())
-                    return await resp.json() #Should be json
+                    j = await resp.json()
+                    return (True, j)
             elif method.lower() == 'post':
                 async with self.session.post(new_url, data=data) as resp:
-                    return await resp.json()
+                    j = await resp.json()
+                    return (True, j)
             elif method.lower() == 'delete':
                 async with self.session.delete(new_url, data=data) as resp:
-                    return await resp.json()
+                    j = await resp.json()
+                    return (True, j)
             elif method.lower() == 'put':
                 async with self.session.put(new_url, data=data) as resp:
-                    return await resp.json()
+                    j = await resp.json()
+                    return (True, j)
             else:
                 raise ValueError(f"Invalid method: {method}")
         except aiohttp.ContentTypeError:
             html = await resp.text()
-            raise ValueError("Expected JSON, was given HTML:\n" + html)
+            return (False, html)
 
     def get_session(self):
         return self.session.cookie_jar._cookies['steamcommunity.com']['sessionid'].value
@@ -198,8 +207,8 @@ class TradeManager(EventEmitter, ConfManager):
         reg = re.compile("https?:\/\/(www.)?steamcommunity.com\/tradeoffer\/new\/?\?partner=\d+(&|&amp;)token=(?P<token>[a-zA-Z0-9-_]+)")
         match = reg.match(trade_offer_url)
         if not match:
-            raise Exception("Unable to match token from trade_offer_url")
-        return match['token']
+            return (False, match)
+        return (True, match['token'])
 
     async def get_inventory(self, steamid: SteamID, appid, contextid=2, tradable_only=1):
         """
@@ -218,7 +227,7 @@ class TradeManager(EventEmitter, ConfManager):
                 inv = await resp.json()
 
         if not inv['success']:
-            return []
+            return (False, inv)
 
         items = []
         for _, item_id in inv['rgInventory'].items():
@@ -227,6 +236,5 @@ class TradeManager(EventEmitter, ConfManager):
             if item_desc is None:
                 items.append(Item(item_id, True))
             items.append(Item(merge_item(item_id, item_desc)))
-        return items
-
+        return (True, items)
 
