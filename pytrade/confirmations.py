@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 import base64
 from bs4 import BeautifulSoup
 from hashlib import sha1
@@ -27,13 +28,23 @@ class Conf:
                 'm': 'android',
                 'tag': tag}
 
-    async def confirm(self):
+    async def confirm(self, loop=0):
         params = self._confirm_params('allow')
         params['op'] = 'allow'
         params['cid'] = self.data_confid
         params['ck'] = self.data_key
-        async with self.manager.session.get(self.manager.CONF_URL + '/ajaxop', params=params) as resp:
-            return await resp.text()
+        try:
+            async with self.manager.session.get(self.manager.CONF_URL + '/ajaxop', params=params) as resp:
+                 r = resp.text()
+                 return (True, r)
+        except TypeError:
+            if loop >= 3:
+                return (False, r)
+            loop += 1
+            self.manager.logged_on = False
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(asyncio.ensure_future(self.manager.login()))
+            await self.confirm(loop)
 
     async def anfirm(self):
         params = self._confirm_params('cancel')
@@ -41,13 +52,15 @@ class Conf:
         params['cid'] = self.data_confid
         params['ck'] = self.data_key
         async with self.manager.session.get(self.manager.CONF_URL + '/ajaxop', params=params) as resp:
-            return await resp.text()
+            r = await resp.text()
+            return (True, r)
 
     async def details(self):
         params = self._confirm_params(self.tag)
         async with self.manager.session.get(ConfManager.CONF_URL + '/details/' + self.id,
                                             params=params) as resp:
-            return await resp.json()['html']
+            d = await resp.json()['html']
+            return (True, d)
 
 
 class ConfManager:
@@ -82,13 +95,13 @@ class ConfManager:
             txt = await resp.text()
             #print(txt)
             if 'incorrect Steam Guard codes.' in txt:
-                raise ValueError('Invalid identity_secret')
+                return (False, txt)
             confs = txt
             if 'Oh nooooooes!' in txt:
-                raise Exception("An error occurred on steam's side: Might be rate limited?")
+                return (False, txt)
         soup = BeautifulSoup(confs, 'html.parser')
         if soup.select('#mobileconf_empty'):
-            return []
+            return (True, [])
         confirms = []
         for confirmation in soup.select('#mobileconf_list .mobileconf_list_entry'):
             id = confirmation['id']
@@ -96,15 +109,18 @@ class ConfManager:
             key = confirmation['data-key']
             creator = confirmation.get('data-creator')
             confirms.append(Conf(id, confid, key, self, creator))
-        return confirms
+        return (True, confirms)
 
     async def get_trade_confirmation(self, trade_offer_id, confs=None):
         if confs is None:
             confs = await self.get_confirmations()
+            if not confs[0]:
+                return (False, confs[1])
+            confs = confs[1]
         for conf in confs:
             if conf.creator == trade_offer_id:
-                return conf
-        raise IndexError(f"Could not find confirmation for trade: {trade_offer_id}")
+                return (True, conf)
+        return (False, f"Could not find confirmation for trade: {trade_offer_id}")
 
     @property
     def device_id(self):
