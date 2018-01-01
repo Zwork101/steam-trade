@@ -94,6 +94,10 @@ class TradeManager(EventEmitter, ConfManager):
         """
         offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
                             get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
+        if offers[0]:
+            offers = offers[1]
+        else:
+            return (False, offers[1])
         sent_offers = []
         got_offers = []
         trade_offers = {}
@@ -114,7 +118,7 @@ class TradeManager(EventEmitter, ConfManager):
                 got_offers.append(trade_offer)
             trade_offers['received'] = got_offers
 
-        return trade_offers
+        return (True, trade_offers)
 
     async def _trade_poll(self):
         #First, check for new trades
