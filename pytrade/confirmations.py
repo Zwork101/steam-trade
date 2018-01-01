@@ -116,9 +116,10 @@ class ConfManager:
             confs = await self.get_confirmations()
             if not confs[0]:
                 return (False, confs[1])
+            confs = confs[1]
         for conf in confs:
             if conf.creator == trade_offer_id:
-                return (True. conf)
+                return (True, conf)
         return (False, f"Could not find confirmation for trade: {trade_offer_id}")
 
     @property

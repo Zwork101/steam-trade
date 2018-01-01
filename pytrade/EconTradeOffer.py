@@ -136,6 +136,7 @@ class TradeOffer:
                             if not conf[0]:
                                 tries += 1
                                 continue
+                            conf = conf[1]
                             resp = await conf.confirm()
                             if resp[0]:
                                  return (True, conf)
