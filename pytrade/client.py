@@ -7,6 +7,7 @@ import aiohttp
 import asyncio
 from pyee import EventEmitter
 import re
+from copy import copy
 
 def require_login(func):
     async def wrapper(*args, **kwargs):
@@ -41,6 +42,7 @@ class TradeManager(EventEmitter, ConfManager):
         self.logged_in = False
         self._trade_cache = {}
         self._conf_cache = {}
+        self.first_run = True
 
     async def login(self, async_client):
         """
@@ -50,6 +52,10 @@ class TradeManager(EventEmitter, ConfManager):
 
         :param async_client: Does not need to be logged in, import from pytrade.login
         """
+        if self.first_run:
+            self.async_client = copy(async_client)
+            self.first_run = False
+        
         if async_client.logged_in:
             self.session = async_client.session
             self.logged_in = True
@@ -122,7 +128,12 @@ class TradeManager(EventEmitter, ConfManager):
 
     async def _trade_poll(self):
         #First, check for new trades
-        trades = await self.get_trade_offers(active_only=False, sent=True, received=True)
+        try:
+            trades = await self.get_trade_offers(active_only=False, sent=True, received=True)
+        except aiohttp.client_exceptions.ServerDisconnectedError:
+            self.emit('poll_error')
+            await self.login(self.async_client)
+            return
         if not trades[0]:
             self.emit('poll_error', trades[1])
             return
