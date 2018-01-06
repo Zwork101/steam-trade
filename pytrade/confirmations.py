@@ -101,7 +101,7 @@ class ConfManager:
                     return (False, txt)
         except ValueError:
             await self.login(self.async_client)
-            if self.async_client.test_login():
+            if await self.async_client.test_login():
                 async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
                     txt = await resp.text()
                     if 'incorrect Steam Guard codes.' in txt:
