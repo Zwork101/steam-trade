@@ -100,9 +100,8 @@ class ConfManager:
                 if 'Oh nooooooes!' in txt:
                     return (False, txt)
         except ValueError:
-            loop = asyncio.get_event_loop()
             await self.login(self.async_client)
-            if self.manager.async_client.test_login():
+            if self.async_client.test_login():
                 async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
                     txt = await resp.text()
                     if 'incorrect Steam Guard codes.' in txt:
