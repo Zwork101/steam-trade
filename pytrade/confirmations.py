@@ -101,7 +101,7 @@ class ConfManager:
                     return (False, txt)
         except ValueError:
             loop = asyncio.get_event_loop()
-            loop.run_until_complete(asyncio.ensure_future(self.login(self.async_client)))
+            await self.login(self.async_client)
             if self.manager.async_client.test_login():
                 async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
                     txt = await resp.text()
