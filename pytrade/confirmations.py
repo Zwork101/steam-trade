@@ -110,7 +110,7 @@ class ConfManager:
                     confs = txt
                     if 'Oh nooooooes!' in txt:
                         return (False, txt)
-             else:
+            else:
                 return (False, "Unable to re-login")
             
         soup = BeautifulSoup(confs, 'html.parser')
