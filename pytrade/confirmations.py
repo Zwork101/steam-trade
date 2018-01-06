@@ -38,13 +38,12 @@ class Conf:
                  r = resp.text()
                  return (True, r)
         except TypeError:
-            if loop >= 3:
-                return (False, r)
-            loop += 1
+            if loop:
+                return (False, "Unable to re-login")
             self.manager.logged_on = False
             loop = asyncio.get_event_loop()
             loop.run_until_complete(asyncio.ensure_future(self.manager.login()))
-            await self.confirm(loop)
+            await self.confirm(loop=1)
 
     async def anfirm(self):
         params = self._confirm_params('cancel')
@@ -91,14 +90,29 @@ class ConfManager:
         confs = ''
         params = self._create_confirmation_params('conf')
         headers = {'X-Requested-With': 'com.valvesoftware.android.steam.community'}
-        async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
-            txt = await resp.text()
-            #print(txt)
-            if 'incorrect Steam Guard codes.' in txt:
-                return (False, txt)
-            confs = txt
-            if 'Oh nooooooes!' in txt:
-                return (False, txt)
+        
+        try:
+            async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
+                txt = await resp.text()
+                if 'incorrect Steam Guard codes.' in txt:
+                    return (False, txt)
+                confs = txt
+                if 'Oh nooooooes!' in txt:
+                    return (False, txt)
+        except ValueError:
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(asyncio.ensure_future(self.manager.login(self.manager.async_client)))
+            if self.manager.async_client.test_login():
+                async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
+                txt = await resp.text()
+                if 'incorrect Steam Guard codes.' in txt:
+                    return (False, txt)
+                confs = txt
+                if 'Oh nooooooes!' in txt:
+                    return (False, txt)
+             else:
+                return (False, "Unable to re-login")
+            
         soup = BeautifulSoup(confs, 'html.parser')
         if soup.select('#mobileconf_empty'):
             return (True, [])
