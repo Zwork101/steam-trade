@@ -104,12 +104,12 @@ class ConfManager:
             loop.run_until_complete(asyncio.ensure_future(self.manager.login(self.manager.async_client)))
             if self.manager.async_client.test_login():
                 async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
-                txt = await resp.text()
-                if 'incorrect Steam Guard codes.' in txt:
-                    return (False, txt)
-                confs = txt
-                if 'Oh nooooooes!' in txt:
-                    return (False, txt)
+                    txt = await resp.text()
+                    if 'incorrect Steam Guard codes.' in txt:
+                        return (False, txt)
+                    confs = txt
+                    if 'Oh nooooooes!' in txt:
+                        return (False, txt)
              else:
                 return (False, "Unable to re-login")
             
