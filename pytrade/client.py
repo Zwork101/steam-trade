@@ -131,7 +131,12 @@ class TradeManager(EventEmitter, ConfManager):
         try:
             trades = await self.get_trade_offers(active_only=False, sent=True, received=True)
         except aiohttp.client_exceptions.ServerDisconnectedError:
-            self.emit('poll_error')
+            self.emit('poll_error', "Server Disconnected.")
+            await self.login(self.async_client)
+            return
+        except ValueError:
+            self.emit('poll_error', 'Can only redirect to http or https')
+            await asyncio.sleep(10)
             await self.login(self.async_client)
             return
         if not trades[0]:
@@ -155,7 +160,13 @@ class TradeManager(EventEmitter, ConfManager):
                 self._test_states(trade)
 
     async def _confirmation_poll(self):
-        confs = await self.get_confirmations()
+        try:
+            confs = await self.get_confirmations()
+        except ValueError:
+            self.emit('poll_error', 'Can only redirect to http or https')
+            await asyncio.sleep(10)
+            await self.login(self.async_client)
+            return
         if not confs[0]:
             self.emit('poll_error', confs[1])
         for conf in confs[1]:
