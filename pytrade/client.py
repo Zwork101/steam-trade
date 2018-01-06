@@ -98,12 +98,32 @@ class TradeManager(EventEmitter, ConfManager):
         :param received:
         :return trade_list:
         """
-        offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
+        
+        try:
+            offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
                             get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
+        except aiohttp.client_exceptions.ServerDisconnectedError:
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(asyncio.ensure_future(self.login(self.async_client)))
+            if await self.test_login():
+                offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
+                            get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
+            else:
+                return (False, "Server Disconnected.")
+        except ValueError:
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(asyncio.ensure_future(self.login(self.async_client)))
+            if await self.test_login():
+                offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
+                            get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
+            else:
+                return (False, "Could not re-login")
+        
         if offers[0]:
             offers = offers[1]
         else:
             return (False, offers[1])
+        
         sent_offers = []
         got_offers = []
         trade_offers = {}
@@ -128,18 +148,17 @@ class TradeManager(EventEmitter, ConfManager):
 
     async def _trade_poll(self):
         #First, check for new trades
-        try:
-            trades = await self.get_trade_offers(active_only=False, sent=True, received=True)
-        except aiohttp.client_exceptions.ServerDisconnectedError:
-            self.emit('poll_error')
-            await self.login(self.async_client)
-            return
+        
+        trades = await self.get_trade_offers(True, True, True)
+        
         if not trades[0]:
             self.emit('poll_error', trades[1])
             return
+        
         trades = trades[1]
         got_trades = trades.get('received', [])
         sent_trades = trades.get('sent', [])
+        
         for trade in got_trades:
             if trade.tradeofferid not in self._trade_cache.keys():
                 self._trade_cache[trade.tradeofferid] = trade
@@ -156,8 +175,10 @@ class TradeManager(EventEmitter, ConfManager):
 
     async def _confirmation_poll(self):
         confs = await self.get_confirmations()
+        
         if not confs[0]:
             self.emit('poll_error', confs[1])
+            
         for conf in confs[1]:
             if conf.id not in self._conf_cache.keys():
                 self._conf_cache[conf.id] = conf
