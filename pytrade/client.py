@@ -149,7 +149,7 @@ class TradeManager(EventEmitter, ConfManager):
     async def _trade_poll(self):
         #First, check for new trades
         
-        trades = self.get_trade_offers(True, True, True)
+        trades = await self.get_trade_offers(True, True, True)
         
         if not trades[0]:
             self.emit('poll_error', trades[1])
