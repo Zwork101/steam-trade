@@ -57,7 +57,7 @@ async def new_offer(trade_offer):
     elif losing_metal <= gaining_metal and losing_keys <= gaining_keys:
         # This offer isn't going to lose us money - let's accept
         # Please note that a production bot should really convert some keys to ref if this is False
-        # Otherwise banking items on a key boundary (eg sell for 2 keys, buy for 1 key 35 ref)
+        # Otherwise banking items on a key boundary (eg sell for 2 keys, buy for 1 key 35 ref) will not work
         response = await trade_offer.accept()
         if response[0]:
             print("Accepted trade")
