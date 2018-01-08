@@ -17,6 +17,12 @@ async def new_offer(trade_offer):
     print(f"Got Offer: {trade_offer.tradeofferid}")
 
 
+# A new confirmation (including ones that are going to be accepted automatically)
+@manager.on('new_conf')
+async def new_conf(conf):
+    print(f"Got confirmation: {conf.id}")
+
+
 # This is called at the end of polling
 @manager.on('end_poll')
 async def poll_end():
