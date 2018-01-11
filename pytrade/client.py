@@ -104,7 +104,7 @@ class TradeManager(EventEmitter, ConfManager):
                             get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
         except (ValueError, aiohttp.client_exceptions.ClientOSError, aiohttp.client_exceptions.ServerDisconnectedError):
             # aiohttp.client_exceptions.ClientOSError - [WinError 10054] An existing connection was forcibly closed by the remote host
-            self.login(self.async_client)
+            await self.login(self.async_client)
             if await self.test_login():
                 offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
                             get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
