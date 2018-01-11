@@ -102,22 +102,14 @@ class TradeManager(EventEmitter, ConfManager):
         try:
             offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
                             get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
-        except aiohttp.client_exceptions.ServerDisconnectedError:
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(asyncio.ensure_future(self.login(self.async_client)))
+        except (ValueError, aiohttp.client_exceptions.ClientOSError, aiohttp.client_exceptions.ServerDisconnectedError):
+            # aiohttp.client_exceptions.ClientOSError - [WinError 10054] An existing connection was forcibly closed by the remote host
+            await self.login(self.async_client)
             if await self.test_login():
                 offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
                             get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
             else:
-                return (False, "Server Disconnected.")
-        except ValueError:
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(asyncio.ensure_future(self.login(self.async_client)))
-            if await self.test_login():
-                offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
-                            get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
-            else:
-                return (False, "Could not re-login")
+                return (False, "Failed to relogin.")
         
         if offers[0]:
             offers = offers[1]
