@@ -170,6 +170,7 @@ class TradeManager(EventEmitter, ConfManager):
         
         if not confs[0]:
             self.emit('poll_error', confs[1])
+            return
             
         for conf in confs[1]:
             if conf.id not in self._conf_cache.keys():
