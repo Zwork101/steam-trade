@@ -108,8 +108,6 @@ class ConfManager:
                 confs = txt
                 if 'Oh nooooooes!' in txt:
                     return (False, txt)
-            else:
-                return (False, "Unable to re-login")
             
         soup = BeautifulSoup(confs, 'html.parser')
         if soup.select('#mobileconf_empty'):
