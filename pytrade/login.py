@@ -70,7 +70,10 @@ class AsyncClient:
                 return {'rsa_key': rsa.PublicKey(mod, exp), 'rsa_timestamp': timestamp}
 
     async def _send_login(self):
-        rsa_keys = await self._get_rsa()
+        try:
+            rsa_keys = await self._get_rsa()
+        except aiohttp.client_exceptions.ClientConnectorError:
+            rsa_keys = await self._get_rsa()
         encrypt_pass = self._encrypt_password(rsa_keys)
         request_payload = self._prep_login(encrypt_pass, rsa_keys['rsa_timestamp'])
         async with self.session.post(SteamUrls.Store.value + '/login/dologin', data=request_payload) as resp:
