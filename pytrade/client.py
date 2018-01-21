@@ -107,8 +107,6 @@ class TradeManager(EventEmitter, ConfManager):
             await self.login(self.async_client)
             offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
                         get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
-            else:
-                return (False, "Failed to relogin.")
         
         if offers[0]:
             offers = offers[1]
