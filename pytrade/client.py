@@ -111,7 +111,7 @@ class TradeManager(EventEmitter, ConfManager):
         if offers[0]:
             offers = offers[1]
         else:
-            return (False, offers[1])
+            return False, offers[1]
         
         sent_offers = []
         got_offers = []
@@ -133,7 +133,7 @@ class TradeManager(EventEmitter, ConfManager):
                 got_offers.append(trade_offer)
             trade_offers['received'] = got_offers
 
-        return (True, trade_offers)
+        return True, trade_offers
 
     async def _trade_poll(self):
         #First, check for new trades
@@ -207,24 +207,24 @@ class TradeManager(EventEmitter, ConfManager):
             if method.lower() == 'get':
                 async with self.session.get(new_url, params=data) as resp:
                     j = await resp.json()
-                    return (True, j)
+                    return True, j
             elif method.lower() == 'post':
                 async with self.session.post(new_url, data=data) as resp:
                     j = await resp.json()
-                    return (True, j)
+                    return True, j
             elif method.lower() == 'delete':
                 async with self.session.delete(new_url, data=data) as resp:
                     j = await resp.json()
-                    return (True, j)
+                    return True, j
             elif method.lower() == 'put':
                 async with self.session.put(new_url, data=data) as resp:
                     j = await resp.json()
-                    return (True, j)
+                    return True, j
             else:
                 raise ValueError(f"Invalid method: {method}")
         except aiohttp.ContentTypeError:
             html = await resp.text()
-            return (False, html)
+            return False, html
 
     def get_session(self):
         return self.session.cookie_jar._cookies['steamcommunity.com']['sessionid'].value
@@ -233,8 +233,8 @@ class TradeManager(EventEmitter, ConfManager):
         reg = re.compile("https?:\/\/(www.)?steamcommunity.com\/tradeoffer\/new\/?\?partner=\d+(&|&amp;)token=(?P<token>[a-zA-Z0-9-_]+)")
         match = reg.match(trade_offer_url)
         if not match:
-            return (False, match)
-        return (True, match['token'])
+            return False, match
+        return True, match['token']
 
     async def get_inventory(self, steamid: SteamID, appid, contextid=2, tradable_only=1):
         """
@@ -253,7 +253,7 @@ class TradeManager(EventEmitter, ConfManager):
                 inv = await resp.json()
 
         if not inv['success']:
-            return (False, inv)
+            return False, inv
 
         items = []
         for _, item_id in inv['rgInventory'].items():
@@ -262,5 +262,5 @@ class TradeManager(EventEmitter, ConfManager):
             if item_desc is None:
                 items.append(Item(item_id, True))
             items.append(Item(merge_item(item_id, item_desc)))
-        return (True, items)
+        return True, items
 
