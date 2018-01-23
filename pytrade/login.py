@@ -93,7 +93,7 @@ class AsyncClient:
             'captcha_text': '',
             'emailsteamid': '',
             'rsatimestamp': timestamp,
-            'remember_login': 'false',
+            'remember_login': 'true',
             'donotcache': str(int(time.time() * 1000))
         }
 
