@@ -36,10 +36,10 @@ class Conf:
         try:
             async with self.manager.session.get(self.manager.CONF_URL + '/ajaxop', params=params) as resp:
                  r = resp.text()
-                 return (True, r)
+                 return True, r
         except TypeError:
             if loop:
-                return (False, "Unable to re-login")
+                return False, "Unable to re-login"
             self.manager.logged_on = False
             loop = asyncio.get_event_loop()
             loop.run_until_complete(asyncio.ensure_future(self.manager.login()))
@@ -52,14 +52,14 @@ class Conf:
         params['ck'] = self.data_key
         async with self.manager.session.get(self.manager.CONF_URL + '/ajaxop', params=params) as resp:
             r = await resp.text()
-            return (True, r)
+            return True, r
 
     async def details(self):
         params = self._confirm_params(self.tag)
         async with self.manager.session.get(ConfManager.CONF_URL + '/details/' + self.id,
                                             params=params) as resp:
             d = await resp.json()['html']
-            return (True, d)
+            return True, d
 
 
 class ConfManager:
@@ -95,19 +95,19 @@ class ConfManager:
             async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
                 txt = await resp.text()
                 if 'incorrect Steam Guard codes.' in txt:
-                    return (False, txt)
+                    return False, txt
                 confs = txt
                 if 'Oh nooooooes!' in txt:
-                    return (False, txt)
-        except ValueError:
+                    return False, txt
+        except (ValueError, aiohttp.client_exceptions.ServerDisconnectedError:
             await self.login(self.async_client)
             async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
                 txt = await resp.text()
                 if 'incorrect Steam Guard codes.' in txt:
-                    return (False, txt)
+                    return False, txt
                 confs = txt
                 if 'Oh nooooooes!' in txt:
-                    return (False, txt)
+                    return False, txt
             
         soup = BeautifulSoup(confs, 'html.parser')
         if soup.select('#mobileconf_empty'):
@@ -119,7 +119,7 @@ class ConfManager:
             key = confirmation['data-key']
             creator = confirmation.get('data-creator')
             confirms.append(Conf(id, confid, key, self, creator))
-        return (True, confirms)
+        return True, confirms
 
     async def get_trade_confirmation(self, trade_offer_id, confs=None):
         if confs is None:
@@ -129,8 +129,8 @@ class ConfManager:
             confs = confs[1]
         for conf in confs:
             if conf.creator == trade_offer_id:
-                return (True, conf)
-        return (False, f"Could not find confirmation for trade: {trade_offer_id}")
+                return True, conf
+        return False, f"Could not find confirmation for trade: {trade_offer_id}"
 
     @property
     def device_id(self):
