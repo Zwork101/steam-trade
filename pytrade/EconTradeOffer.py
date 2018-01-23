@@ -87,17 +87,18 @@ class TradeOffer:
         this_offer = await self.manager.api_call('GET', 'IEconService', 'GetTradeOffer', 'v1', key=self.manager.key,
                                                  tradeofferid=self.tradeofferid, language=self.manager.language)
         if not this_offer[0]:
-            return (False, this_offer[1])
+            return False, this_offer[1]
+        this_offer = this_offer[1]
         self._load(this_offer['response']['offer'], this_offer['response'].get('descriptions', []), self.manager, True)
-        return (True, self)
+        return True, self
 
     @require_manager_key
     async def cancel(self):
         if self.trade_offer_state != ETradeOfferState.Active and \
                         self.trade_offer_state != ETradeOfferState.CreatedNeedsConfirmation:
-            return (False, 'This trade is not active')
+            return False, 'This trade is not active'
         elif not self.is_our_offer:
-            return (False, "This is not our trade, try declining.")
+            return False, "This is not our trade, try declining."
         return await self.manager.api_call('POST', 'IEconService', 'CancelTradeOffer', 'v1',
                                            key=self.manager.key, tradeofferid=self.tradeofferid)
 
@@ -106,16 +107,16 @@ class TradeOffer:
     async def decline(self):
         if self.trade_offer_state != ETradeOfferState.Active and \
                         self.trade_offer_state != ETradeOfferState.CreatedNeedsConfirmation:
-            return (False, 'This trade is not active')
+            return False, 'This trade is not active'
         elif self.is_our_offer:
-            return (False, "This is our trade, try canceling.")
+            return False, "This is our trade, try canceling."
         return await self.manager.api_call('POST', 'IEconService', 'DeclineTradeOffer', 'v1',
                                            key=self.manager.key, tradeofferid=self.tradeofferid)
 
     @require_manager_key
     async def accept(self, token=''):
         if self.trade_offer_state != ETradeOfferState.Active:
-            return (False, "This trade is not active. If you think it is, try updating it")
+            return False, "This trade is not active. If you think it is, try updating it"
         session_cookie = self.manager.get_session()
         url = SteamUrls.Community.value + '/tradeoffer/' + self.tradeofferid + '/accept'
         info = {'sessionid': session_cookie,
@@ -139,18 +140,18 @@ class TradeOffer:
                             conf = conf[1]
                             resp = await conf.confirm()
                             if resp[0]:
-                                 return (True, conf)
-                            return (False, resp[1])
-                    return (False, "Couldn't find confirmation")
-            return (True, resp_json)
+                                 return True, conf
+                            return False, resp[1]
+                    return False, "Couldn't find confirmation"
+            return True, resp_json
 
     @require_manager_key
     async def ship(self, counter='', token=''):
         if not self._sent:
-            return (False, "Trade already shipped")
+            return False, "Trade already shipped"
 
         if not self.items_to_receive and not self.items_to_give:
-            return (False, "Can't have trade with 0 items")
+            return False, "Can't have trade with 0 items"
 
         our_offer = {
             "newversion": True,
