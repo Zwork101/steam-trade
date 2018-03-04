@@ -44,7 +44,7 @@ async def new_offer(trade_offer):
             # We haven't set a price for this item. Let's decline the offer
             decline = True
 
-    for item in trade_offer.items_to_lose:
+    for item in trade_offer.items_to_give:
         name = item.market_name
         if name in prices:
             losing_keys += prices[name]["sell"]["keys"]
