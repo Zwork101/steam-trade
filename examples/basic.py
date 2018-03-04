@@ -15,7 +15,7 @@ async def login():
 @manager.on('new_trade')
 async def new_offer(trade_offer):
     print(f"Got Offer: {trade_offer.tradeofferid}")
-    if not trade_offer.items_to_lose:  # Not losing any items
+    if not trade_offer.items_to_give:  # Not losing any items
         response = await trade_offer.accept()
         if response[0]:
             print("Accepted trade!")
