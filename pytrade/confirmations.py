@@ -100,7 +100,7 @@ class ConfManager:
                 if 'Oh nooooooes!' in txt:
                     return False, txt
         except (ValueError, aiohttp.client_exceptions.ServerDisconnectedError):
-            await asyncio.sleep(5)
+            await asyncio.sleep(self.login_delay_time)
             await self.login(self.async_client)
             async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
                 txt = await resp.text()
