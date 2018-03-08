@@ -1,4 +1,6 @@
 # steam-trade
+**This is an experimental branch for a semi-major redesign of this project, branching the trade manager off to enable additional managers to seamlessly be added later.**
+Note to self: update README before merging to master
 ### An asynchronous, event based python steam trade lib
 ## Description
 
