@@ -29,7 +29,7 @@ class TradeManager(EventEmitter, ConfManager):
     This is the TradeManager object, it inherits from the ConfManager and EventEmitter objects.
     """
 
-    def __init__(self, steamid, key=None, language='en', identity_secret='', poll_delay=30):
+    def __init__(self, steamid, key=None, language: str='en', identity_secret: str='', poll_delay: int=30, login_delay_time: int=0):
         EventEmitter.__init__(self)
         self.session = aiohttp.ClientSession()
         ConfManager.__init__(self, identity_secret, steamid, self.session)
@@ -43,6 +43,7 @@ class TradeManager(EventEmitter, ConfManager):
         self._trade_cache = {}
         self._conf_cache = {}
         self.first_run = True
+        self.login_delay_time = login_delay_time
 
     async def login(self, async_client):
         """
