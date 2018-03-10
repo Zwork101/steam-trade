@@ -10,7 +10,7 @@ from yarl import URL
 
 class AsyncClient:
 
-    def __init__(self, username, password, shared_secret=None, one_time_code=''):
+    def __init__(self, username: str, password: str, shared_secret: str='', one_time_code: str=''):
         self.username = username
         self.password = password
         self.shared_secret = shared_secret
