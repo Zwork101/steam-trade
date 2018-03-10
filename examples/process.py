@@ -1,5 +1,5 @@
 import asyncio
-from pytrade import login, client
+import pytrade
 import json
 
 # Open a premade prices file.
@@ -8,18 +8,19 @@ import json
 with open("prices.json", "r") as f:
     prices = json.load(f)
 
-steam_cli = login.AsyncClient('name', 'pass', shared_secret='secret')
-manager = client.TradeManager('steam 64 id', key='apikey', identity_secret='your other secret')
+steam_client = pytrade.login.AsyncClient('name', 'pass', shared_secret='secret')
+trade_manager = pytrade.manager_trade.TradeManager('steam 64 id', key='apikey', identity_secret='your other secret')
+global_manager = pytrade.GlobalManager([trade_manager])
 
 
-# This will be called, when it completes the client.login
-@manager.on('logged_on')
+# Client has logged in
+@trade_manager.on('logged_on')
 async def login():
     print('Logged in!')
 
 
-# On a new trade, this will be called. an EconTradeOffer.TradeOffer object will be passed in
-@manager.on('new_trade')
+# A new trade has been received. Gives an EconTradeOffer.TradeOffer object
+@trade_manager.on('new_trade')
 async def new_offer(trade_offer):
     print(f"Got Offer: {trade_offer.tradeofferid}")
     losing_metal = 0
@@ -66,5 +67,5 @@ async def new_offer(trade_offer):
 
 # This is the basic setup for the program, and it will run forever. Currently, there is no "nice" way to end it.
 loop = asyncio.get_event_loop()
-loop.run_until_complete(asyncio.ensure_future(manager.login(steam_cli)))
-manager.run_forever()
+loop.run_until_complete(asyncio.ensure_future(trade_manager.login(steam_client)))
+global_manager.run_forever()

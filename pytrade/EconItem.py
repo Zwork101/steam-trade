@@ -6,9 +6,8 @@ class Item:
 
     def __init__(self, data, missing=False):
         """
-        Args:
-            data:
-            missing:
+        :param data:
+        :param missing:
         """
         self.appid = data.get('appid')
         self.classid = data.get('classid')
@@ -28,8 +27,8 @@ class Item:
         self.descriptions = data.get('descriptions', [])
         self.market_hash_name = data.get('market_hash_name')
         self.market_name = data.get('market_name')
-        self.tradable = bool(data.get('tradable')) if data.get('tradable') != None else None
-        self.marketable = bool(data.get('marketable')) if data.get('marketable') != None else None
+        self.tradable = bool(data.get('tradable')) if data.get('tradable') is not None else None
+        self.marketable = bool(data.get('marketable')) if data.get('marketable') is not None else None
         self.market_tradable_restriction = data.get('market_tradable_restriction')
         self.name_color = data.get('name_color')
         self.background_color = data.get('background_color')
@@ -39,22 +38,12 @@ class Item:
 
     @property
     def small_image(self):
-        """
-
-        Returns:
-
-        """
         if not self.icon_url:
             return None
         return "https://steamcommunity-a.akamaihd.net/economy/image/" + self.icon_url
 
     @property
     def large_image(self):
-        """
-
-        Returns:
-
-        """
         if not self.icon_url_large:
             return None
         return "https://steamcommunity-a.akamaihd.net/economy/image/" + self.icon_url_large

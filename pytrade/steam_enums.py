@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class ETradeOfferState(Enum):
     """
     """
@@ -14,6 +15,7 @@ class ETradeOfferState(Enum):
     NeedsConfirmation = 9
     CanceledBySecondFactor = 10
     Escrow = 11
+
 
 class SteamUrls(Enum):
     """
