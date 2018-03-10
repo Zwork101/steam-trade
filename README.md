@@ -22,7 +22,7 @@ from pytrade import *
 ## Usage
 First, you will need to create an *AsyncClient* object, and a *TradeManager* object (see why the AsyncClient object is required in **FAQ**)
 ```py
-steam_login = login.AsyncClient("Zwork101", "abc123", "super-secret-secret")
+steam_login = login.AsyncClient("Zwork101", "abc123", shared_secret="super-secret-secret")
 trade_manager = client.TradeManager("12345678", "steam api key", identity_secret="also-super-secret")
 ```
 Now, run "setup" code. Code, like reading a database, or getting prices from a site. This code will only be run once. For example, I might to something like:
