@@ -63,4 +63,4 @@ global_manager.run_forever()
 
  **Q**: Who the hell made this *amazing* library?!?
 
- **A**: Check out the
+ **A**: Check out the [contibutors tab](https://github.com/Zwork101/steam-trade/graphs/contributors)!
