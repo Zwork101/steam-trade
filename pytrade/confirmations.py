@@ -35,8 +35,8 @@ class Conf:
         params['ck'] = self.data_key
         try:
             async with self.manager.session.get(self.manager.CONF_URL + '/ajaxop', params=params) as resp:
-                 r = resp.text()
-                 return True, r
+                r = resp.text()
+                return True, r
         except TypeError:
             if loop:
                 return False, "Unable to re-login"
@@ -87,32 +87,29 @@ class ConfManager:
                 'tag': tag}
 
     async def get_confirmations(self):
-        confs = ''
         params = self._create_confirmation_params('conf')
         headers = {'X-Requested-With': 'com.valvesoftware.android.steam.community'}
         
         try:
             async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
-                txt = await resp.text()
-                if 'incorrect Steam Guard codes.' in txt:
-                    return False, txt
-                confs = txt
-                if 'Oh nooooooes!' in txt:
-                    return False, txt
+                confs = await resp.text()
+                if 'incorrect Steam Guard codes.' in confs:
+                    return False, confs
+                if 'Oh nooooooes!' in confs:
+                    return False, confs
         except (ValueError, aiohttp.client_exceptions.ServerDisconnectedError):
             await asyncio.sleep(self.login_delay_time)
             await self.login(self.async_client)
             async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
-                txt = await resp.text()
-                if 'incorrect Steam Guard codes.' in txt:
-                    return False, txt
-                confs = txt
-                if 'Oh nooooooes!' in txt:
-                    return False, txt
-            
+                confs = await resp.text()
+                if 'incorrect Steam Guard codes.' in confs:
+                    return False, confs
+                if 'Oh nooooooes!' in confs:
+                    return False, confs
+
         soup = BeautifulSoup(confs, 'html.parser')
         if soup.select('#mobileconf_empty'):
-            return (True, [])
+            return True, []
         confirms = []
         for confirmation in soup.select('#mobileconf_list .mobileconf_list_entry'):
             id = confirmation['id']
@@ -126,7 +123,7 @@ class ConfManager:
         if confs is None:
             confs = await self.get_confirmations()
             if not confs[0]:
-                return (False, confs[1])
+                return False, confs[1]
             confs = confs[1]
         for conf in confs:
             if conf.creator == trade_offer_id:

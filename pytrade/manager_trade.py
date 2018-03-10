@@ -265,4 +265,3 @@ class TradeManager(EventEmitter, ConfManager):
                 items.append(Item(item_id, True))
             items.append(Item(merge_item(item_id, item_desc)))
         return True, items
-

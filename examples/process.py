@@ -12,14 +12,15 @@ steam_client = pytrade.login.AsyncClient('name', 'pass', shared_secret='secret')
 trade_manager = pytrade.manager_trade.TradeManager('steam 64 id', key='apikey', identity_secret='your other secret')
 global_manager = pytrade.GlobalManager([trade_manager])
 
-# This will be called, when it completes the client.login
-@global_manager.on('logged_on')
+
+# Client has logged in
+@trade_manager.on('logged_on')
 async def login():
     print('Logged in!')
 
 
-# On a new trade, this will be called. an EconTradeOffer.TradeOffer object will be passed in
-@global_manager.on('new_trade')
+# A new trade has been received. Gives an EconTradeOffer.TradeOffer object
+@trade_manager.on('new_trade')
 async def new_offer(trade_offer):
     print(f"Got Offer: {trade_offer.tradeofferid}")
     losing_metal = 0

@@ -7,12 +7,14 @@ trade_manager = manager_trade.TradeManager('steam 64 id', key='apikey', identity
 global_manager = pytrade.GlobalManager([trade_manager])
 
 
-@global_manager.on('logged_on')
+# Client has logged in
+@trade_manager.on('logged_on')
 async def login():
     print('Logged in!')
 
 
-@global_manager.on('new_trade')
+# A new trade has been received. Gives an EconTradeOffer.TradeOffer object
+@trade_manager.on('new_trade')
 async def new_offer(trade_offer):
     print(f"Got Offer: {trade_offer.tradeofferid}")
     if not trade_offer.items_to_give:  # Not losing any items

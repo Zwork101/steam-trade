@@ -8,8 +8,8 @@ from hashlib import sha1
 import time
 from yarl import URL
 
-class AsyncClient:
 
+class AsyncClient:
     def __init__(self, username: str, password: str, shared_secret: str='', one_time_code: str=''):
         self.username = username
         self.password = password
@@ -21,7 +21,6 @@ class AsyncClient:
 
     async def test_login(self):
         async with self.session.get(SteamUrls.Community.value) as resp:
-           # print(await resp.text())
             if self.username in await resp.text():
                 self.logged_in = True
                 return True
@@ -102,7 +101,7 @@ class AsyncClient:
         if not prams:
             raise Exception('transfer_parameters not found. Steam is having issues')
         for url in resp_json['transfer_urls']:
-            async with self.session.post(url, data=prams) as resp:
+            async with self.session.post(url, data=prams):
                 pass
 
     @property
@@ -110,8 +109,7 @@ class AsyncClient:
         if self._one_time_code:
             return self._one_time_code
         elif not self.shared_secret:
-            return input("Please enter one time code: ")
-        #This code can be found in the steampy modual. I'm not smart enough to understand this.
+            return input("Please enter a steam guard code: ")
         time_buffer = struct.pack('>Q', int(time.time()) // 30)  # pack as Big endian, uint64
         time_hmac = hmac.new(base64.b64decode(self.shared_secret), time_buffer, digestmod=sha1).digest()
         begin = ord(time_hmac[19:20]) & 0xf

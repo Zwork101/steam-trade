@@ -102,7 +102,6 @@ class TradeOffer:
         return await self.manager.api_call('POST', 'IEconService', 'CancelTradeOffer', 'v1',
                                            key=self.manager.key, tradeofferid=self.tradeofferid)
 
-
     @require_manager_key
     async def decline(self):
         if self.trade_offer_state != ETradeOfferState.Active and \
@@ -114,7 +113,7 @@ class TradeOffer:
                                            key=self.manager.key, tradeofferid=self.tradeofferid)
 
     @require_manager_key
-    async def accept(self, token=''):
+    async def accept(self):
         if self.trade_offer_state != ETradeOfferState.Active:
             return False, "This trade is not active. If you think it is, try updating it"
         session_cookie = self.manager.get_session()
@@ -140,13 +139,13 @@ class TradeOffer:
                             conf = conf[1]
                             resp = await conf.confirm()
                             if resp[0]:
-                                 return True, conf
+                                return True, conf
                             return False, resp[1]
                     return False, "Couldn't find confirmation"
             return True, resp_json
 
     @require_manager_key
-    async def ship(self, counter='', token=''):
+    async def ship(self, token=''):
         if not self._sent:
             return False, "Trade already shipped"
 
@@ -169,7 +168,7 @@ class TradeOffer:
 
         trade_prams = '{}'
         if token:
-            trade_prams = {'trade_offer_access_token':token}
+            trade_prams = {'trade_offer_access_token': token}
             trade_prams = json.dumps(trade_prams)
 
         data = {
