@@ -90,6 +90,7 @@ class TradeManager(EventEmitter, ConfManager):
             await self._trade_poll()
             await self._confirmation_poll()
             self.emit("trade_end_poll")
+            self.last_poll = time()
 
     @require_key
     async def get_trade_offers(self, active_only=True, sent=False, received=True):
