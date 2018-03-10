@@ -1,18 +1,18 @@
 import asyncio
-from pytrade import login, client
+import pytrade
+from pytrade import login, manager_trade
 
-steam_cli = login.AsyncClient('name', 'pass', shared_secret='secret')
-manager = client.TradeManager('steam 64 id', key='apikey', identity_secret='your other secret')
+steam_client = login.AsyncClient('name', 'pass', shared_secret='secret')
+trade_manager = manager_trade.TradeManager('steam 64 id', key='apikey', identity_secret='your other secret')
+global_manager = pytrade.GlobalManager([trade_manager])
 
 
-# This will be called, when it completes the client.login
-@manager.on('logged_on')
+@global_manager.on('logged_on')
 async def login():
     print('Logged in!')
 
 
-# On a new trade, this will be called. an EconTradeOffer.TradeOffer object will be passed in
-@manager.on('new_trade')
+@global_manager.on('new_trade')
 async def new_offer(trade_offer):
     print(f"Got Offer: {trade_offer.tradeofferid}")
     if not trade_offer.items_to_give:  # Not losing any items
@@ -29,7 +29,6 @@ async def new_offer(trade_offer):
             print(f"Failed to decline trade: {response[1]}")
 
 
-# This is the basic setup for the program, and it will run forever. Currently, there is no "nice" way to end it.
 loop = asyncio.get_event_loop()
-loop.run_until_complete(asyncio.ensure_future(manager.login(steam_cli)))
-manager.run_forever()
+loop.run_until_complete(asyncio.ensure_future(trade_manager.login(steam_client)))
+global_manager.run_forever()

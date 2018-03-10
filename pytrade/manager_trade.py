@@ -4,10 +4,11 @@ from pytrade.EconItem import Item
 from pytrade.confirmations import ConfManager
 from steamid import SteamID
 import aiohttp
-import asyncio
 from pyee import EventEmitter
 import re
 from copy import copy
+from time import time
+
 
 def require_login(func):
     async def wrapper(*args, **kwargs):
@@ -16,6 +17,7 @@ def require_login(func):
         return await func(*args, **kwargs)
     return wrapper
 
+
 def require_key(func):
     async def wrapper(*args, **kwargs):
         if not args[0].key:
@@ -23,13 +25,25 @@ def require_key(func):
         return await func(*args, **kwargs)
     return wrapper
 
+
 class TradeManager(EventEmitter, ConfManager):
 
     """
     This is the TradeManager object, it inherits from the ConfManager and EventEmitter objects.
     """
 
-    def __init__(self, steamid, key=None, language: str='en', identity_secret: str='', poll_delay: int=30, login_delay_time: int=0):
+    def __init__(self, steamid, key=None, language: str='en', identity_secret: str='', poll_delay: int=30,
+                 login_delay_time: int=0):
+        """
+
+        :param steamid: stemid64
+        :param key: steam api key
+        :param language:
+        :param identity_secret:
+        :param poll_delay: how often trades should be polled (too often can cause errors, too infrequent can make your
+        bot too slow to respond
+        :param login_delay_time: how long to wait after our session died to retry
+        """
         EventEmitter.__init__(self)
         self.session = aiohttp.ClientSession()
         ConfManager.__init__(self, identity_secret, steamid, self.session)
@@ -39,6 +53,7 @@ class TradeManager(EventEmitter, ConfManager):
         self.key = key
         self.language = language
         self.poll_delay = poll_delay
+        self.last_poll = 0
         self.logged_in = False
         self._trade_cache = {}
         self._conf_cache = {}
@@ -67,47 +82,37 @@ class TradeManager(EventEmitter, ConfManager):
                 self.logged_in = True
             else:
                 raise ValueError("Login Failed")
-        self.emit('logged_on')
+        self.emit("logged_on")
 
-    async def _run_forever(self):
-        while True:
-            self.emit('start_poll')
-            #Check for current actions, then parse them
+    async def poll(self):
+        if time() - self.last_poll > self.poll_delay:
+            self.emit("trade_start_poll")
             await self._trade_poll()
             await self._confirmation_poll()
-            self.emit('end_poll')
-            await asyncio.sleep(self.poll_delay)
-
-    def run_forever(self):
-        """
-        Run the bot forever, unless the time sense calling the function is greater than timeout.
-
-        :param timeout: :class int/float:
-        :return: (Will never return, but if it does, None)
-        """
-        loop = asyncio.get_event_loop()
-        asyncio.ensure_future(self._run_forever())
-        loop.run_forever()
+            self.emit("trade_end_poll")
 
     @require_key
     async def get_trade_offers(self, active_only=True, sent=False, received=True):
         """
-        get your trade offers, key is required.
+        Get your trade offers, key is required.
 
         :param active_only:
-        :`param sent:
+        :param sent:
         :param received:
         :return trade_list:
         """
         
         try:
             offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
-                            get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
+                                         get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1,
+                                         key=self.key)
         except (ValueError, aiohttp.client_exceptions.ClientOSError, aiohttp.client_exceptions.ServerDisconnectedError):
-            # aiohttp.client_exceptions.ClientOSError - [WinError 10054] An existing connection was forcibly closed by the remote host
+            # aiohttp.client_exceptions.ClientOSError:
+            # [WinError 10054] An existing connection was forcibly closed by the remote host
             await self.login(self.async_client)
             offers = await self.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', langauge=self.language,
-                        get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1, key=self.key)
+                                         get_descriptions=1, active_only=1, get_sent_offers=1, get_received_offers=1,
+                                         key=self.key)
         
         if offers[0]:
             offers = offers[1]
@@ -137,12 +142,10 @@ class TradeManager(EventEmitter, ConfManager):
         return True, trade_offers
 
     async def _trade_poll(self):
-        #First, check for new trades
-        
         trades = await self.get_trade_offers(True, True, True)
         
         if not trades[0]:
-            self.emit('poll_error', trades[1])
+            self.emit('trade_poll_error', trades[1])
             return
         
         trades = trades[1]
@@ -167,14 +170,13 @@ class TradeManager(EventEmitter, ConfManager):
         confs = await self.get_confirmations()
         
         if not confs[0]:
-            self.emit('poll_error', confs[1])
+            self.emit('trade_poll_error', confs[1])
             return
             
         for conf in confs[1]:
             if conf.id not in self._conf_cache.keys():
                 self._conf_cache[conf.id] = conf
                 self.emit('new_conf', conf)
-
 
     def _test_states(self, trade):
         if trade.trade_offer_state != self._trade_cache[trade.tradeofferid].trade_offer_state:
@@ -191,7 +193,6 @@ class TradeManager(EventEmitter, ConfManager):
                 self.emit('trade_countered', trade)
             else:
                 self.emit('trade_state_changed', trade)
-
 
     async def api_call(self, method, api, call, version, **data):
         """
@@ -247,10 +248,10 @@ class TradeManager(EventEmitter, ConfManager):
         :param tradable_only:
         :return:
         """
-        async with self.session.get(
-            f"https://steamcommunity.com/profiles/{steamid.toString()}/inventory/json/{appid}/{contextid}",
-            params = {'trading':tradable_only},
-            headers = {"Referer": f"https://steamcommunity.com/profiles/{steamid.toString()}/inventory"}) as resp:
+        url = f"https://steamcommunity.com/profiles/{steamid.toString()}/inventory/json/{appid}/{contextid}"
+        params = {'trading': tradable_only}
+        headers = {"Referer": f"https://steamcommunity.com/profiles/{steamid.toString()}/inventory"}
+        async with self.session.get(url, params=params, headers=headers) as resp:
                 inv = await resp.json()
 
         if not inv['success']:
