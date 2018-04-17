@@ -97,15 +97,24 @@ class ConfManager:
                     return False, confs
                 if 'Oh nooooooes!' in confs:
                     return False, confs
-        except (ValueError, aiohttp.client_exceptions.ServerDisconnectedError):
+        except ValueError:
             await asyncio.sleep(self.login_delay_time)
             await self.login(self.async_client)
             async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
-                confs = await resp.text()
-                if 'incorrect Steam Guard codes.' in confs:
-                    return False, confs
-                if 'Oh nooooooes!' in confs:
-                    return False, confs
+                txt = await resp.text()
+                if 'incorrect Steam Guard codes.' in txt:
+                    return False, txt
+                confs = txt
+                if 'Oh nooooooes!' in txt:
+                    return False, txt
+        except aiohttp.client_exceptions.ServerDisconnectedError:
+            async with self.session.get(self.CONF_URL + '/conf?' + urlencode(params), headers=headers) as resp:
+                txt = await resp.text()
+                if 'incorrect Steam Guard codes.' in txt:
+                    return False, txt
+                confs = txt
+                if 'Oh nooooooes!' in txt:
+                    return False, txt
 
         soup = BeautifulSoup(confs, 'html.parser')
         if soup.select('#mobileconf_empty'):
